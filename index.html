@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpoonSteady - Tremor & Eating Monitor</title>
+  <!-- Library MQTT via WebSocket -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    :root {
+      --primary: #0284c7;
+      --safe: #16a34a;
+      --warning: #eab308;
+      --danger: #dc2626;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+    }
+    h1 {
+      font-size: 1.4rem;
+      margin: 0 0 6px 0;
+      text-align: center;
+    }
+    .role-switch {
+      display: flex;
+      gap: 8px;
+      margin: 16px 0;
+    }
+    .role-btn {
+      flex: 1;
+      padding: 10px;
+      border: 2px solid var(--primary);
+      border-radius: 8px;
+      background: white;
+      color: var(--primary);
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .role-btn.active {
+      background: var(--primary);
+      color: white;
+    }
+    .btn-action {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background: var(--primary);
+      color: white;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .badge.connected { background: #dcfce7; color: var(--safe); }
+    .badge.disconnected { background: #fee2e2; color: var(--danger); }
+    .score-circle {
+      width: 130px;
+      height: 130px;
+      border-radius: 50%;
+      background: #e0f2fe;
+      border: 6px solid var(--primary);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: 20px auto;
+    }
+    .score-val {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: var(--primary);
+    }
+    .score-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #64748b;
+    }
+    .status-alert {
+      text-align: center;
+      padding: 16px;
+      border-radius: 10px;
+      background: #f1f5f9;
+      font-weight: 600;
+      margin-top: 10px;
+    }
+    .status-alert.calm { background: #dcfce7; color: var(--safe); }
+    .status-alert.mild { background: #fef9c3; color: #854d0e; }
+    .status-alert.tremor { background: #fee2e2; color: var(--danger); }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .metric-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .metric-box-title { font-size: 0.75rem; color: #64748b; }
+    .metric-box-val { font-size: 1.2rem; font-weight: 700; margin-top: 4px; }
+    .log-box {
+      background: #0f172a;
+      color: #94a3b8;
+      border-radius: 8px;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      height: 110px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>SpoonSteady 🥣🥄</h1>
+      <p style="text-align: center; margin: 4px 0;">
+        Koneksi MQTT: <span id="connStatus" class="badge disconnected">Offline</span>
+      </p>
+
+      <div class="role-switch">
+        <button id="btnRoleSensor" class="role-btn active" onclick="setRole('sensor')">📱 HP 1 (Sendok / Tangan)</button>
+        <button id="btnRoleMonitor" class="role-btn" onclick="setRole('monitor')">🍽️ HP 2 (Meja Makan)</button>
+      </div>
+
+      <button id="btnStart" class="btn-action" onclick="initApp()">Mulai Sistem</button>
+    </div>
+
+    <!-- Panel HP 1: Pengirim Telemetri Tangan -->
+    <div id="panelSensor" class="card">
+      <h3>Pemantau Gerakan Lengan</h3>
+      <p style="font-size:0.85rem; color:#64748b;">
+        Tempelkan/selipkan HP pada lengan bawah dekat pergelangan tangan untuk membaca osilasi getaran dan kemiringan suapan.
+      </p>
+      <div class="metric-grid">
+        <div class="metric-box">
+          <div class="metric-box-title">Getaran Mikro (RMS)</div>
+          <div class="metric-box-val" id="rmsSensorVal">0.00 m/s²</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-box-title">Sudut Suapan (Pitch)</div>
+          <div class="metric-box-val" id="tiltSensorVal">0°</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel HP 2: Monitor Meja & Bantuan Pengguna -->
+    <div id="panelMonitor" class="card" style="display:none;">
+      <h3>Indikator Kestabilan Suapan</h3>
+      <div class="score-circle" id="scoreCircle">
+        <div class="score-val" id="stabilityScore">100</div>
+        <div class="score-label">STABILITAS %</div>
+      </div>
+      <div id="tremorIndicator" class="status-alert calm">
+        Kondisi Tangan Tenang & Siap Menyuap
+      </div>
+      <div class="metric-grid">
+        <div class="metric-box">
+          <div class="metric-box-title">Intensitas Getaran</div>
+          <div class="metric-box-val" id="monitorRms">0.00 m/s²</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-box-title">Total Suapan Terdeteksi</div>
+          <div class="metric-box-val" id="scoopCount">0 Kali</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h4>Log Transmisi Data</h4>
+      <div class="log-box" id="logText">Menunggu aktivasi sistem...</div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
