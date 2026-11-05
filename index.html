@@ -3,230 +3,177 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SpoonSteady - Tremor & Eating Monitor</title>
+  <title>SpoonSteady</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
-    :root {
-      --primary: #0284c7;
-      --safe: #16a34a;
-      --warning: #eab308;
-      --danger: #dc2626;
-      --bg: #f8fafc;
-      --card: #ffffff;
-      --text: #0f172a;
-    }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: sans-serif;
       margin: 0;
       padding: 16px;
-      background: var(--bg);
-      color: var(--text);
+      background: #f1f5f9;
+      color: #0f172a;
     }
-    .container { max-width: 480px; margin: 0 auto; }
     .card {
-      background: var(--card);
-      border-radius: 14px;
-      padding: 20px;
-      margin-bottom: 16px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      text-align: center;
     }
-    h1 { font-size: 1.4rem; margin: 0 0 6px 0; text-align: center; }
-    .role-switch { display: flex; gap: 8px; margin: 16px 0; }
-    .role-btn {
-      flex: 1; padding: 10px; border: 2px solid var(--primary);
-      border-radius: 8px; background: white; color: var(--primary);
-      font-weight: 600; cursor: pointer;
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin: 12px 0;
     }
-    .role-btn.active { background: var(--primary); color: white; }
-    .btn-action {
-      width: 100%; padding: 12px; border: none; border-radius: 8px;
-      background: var(--primary); color: white; font-size: 1rem;
-      font-weight: bold; cursor: pointer;
+    button {
+      flex: 1;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
     }
-    .badge {
-      display: inline-block; padding: 4px 10px; border-radius: 20px;
-      font-size: 0.85rem; font-weight: 600;
+    .role-btn { background: #e2e8f0; color: #334155; }
+    .role-btn.active { background: #0284c7; color: white; }
+    .action-btn { background: #16a34a; color: white; width: 100%; font-size: 1rem; }
+    .val-box {
+      font-size: 1.8rem;
+      font-weight: bold;
+      margin: 8px 0;
+      color: #0284c7;
     }
-    .badge.connected { background: #dcfce7; color: var(--safe); }
-    .badge.disconnected { background: #fee2e2; color: var(--danger); }
-    .score-circle {
-      width: 130px; height: 130px; border-radius: 50%; background: #e0f2fe;
-      border: 6px solid var(--primary); display: flex; flex-direction: column;
-      align-items: center; justify-content: center; margin: 20px auto;
-    }
-    .score-val { font-size: 2.2rem; font-weight: 800; color: var(--primary); }
-    .score-label { font-size: 0.75rem; font-weight: 600; color: #64748b; }
-    .status-alert {
-      text-align: center; padding: 16px; border-radius: 10px;
-      background: #f1f5f9; font-weight: 600; margin-top: 10px;
-    }
-    .status-alert.calm { background: #dcfce7; color: var(--safe); }
-    .status-alert.mild { background: #fef9c3; color: #854d0e; }
-    .status-alert.tremor { background: #fee2e2; color: var(--danger); }
-    .metric-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px;
-    }
-    .metric-box {
-      background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px;
-      border-radius: 8px; text-align: center;
-    }
-    .metric-box-title { font-size: 0.75rem; color: #64748b; }
-    .metric-box-val { font-size: 1.2rem; font-weight: 700; margin-top: 4px; }
-    .log-box {
-      background: #0f172a; color: #94a3b8; border-radius: 8px;
-      padding: 10px; font-family: monospace; font-size: 0.75rem;
-      height: 110px; overflow-y: auto;
+    .log-area {
+      background: #0f172a;
+      color: #38bdf8;
+      font-family: monospace;
+      font-size: 0.75rem;
+      padding: 10px;
+      border-radius: 8px;
+      height: 100px;
+      overflow-y: auto;
+      text-align: left;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="card">
-      <h1>SpoonSteady 🥣🥄</h1>
-      <p style="text-align: center; margin: 4px 0;">
-        Koneksi MQTT: <span id="connStatus" class="badge disconnected">Offline</span>
-      </p>
 
-      <div class="role-switch">
-        <button id="btnRoleSensor" class="role-btn active" onclick="setRole('sensor')">📱 HP 1 (Sendok / Tangan)</button>
-        <button id="btnRoleMonitor" class="role-btn" onclick="setRole('monitor')">🍽️ HP 2 (Meja Makan)</button>
-      </div>
-
-      <button id="btnStart" class="btn-action" onclick="initApp()">Mulai Sistem</button>
+  <div class="card">
+    <h2>SpoonSteady 🥣</h2>
+    <p>Status: <b id="mqttStatus" style="color: red;">Offline</b></p>
+    
+    <div class="btn-group">
+      <button id="btnRole1" class="role-btn active" onclick="pilihMod('sensor')">📱 HP 1 (Senduk)</button>
+      <button id="btnRole2" class="role-btn" onclick="pilihMod('monitor')">🍽️ HP 2 (Meja)</button>
     </div>
 
-    <!-- Panel HP 1: Sensor Tangan -->
-    <div id="panelSensor" class="card">
-      <h3>Pemantau Gerakan Lengan</h3>
-      <p style="font-size:0.85rem; color:#64748b;">
-        Pegang atau pasang HP pada lengan untuk membaca osilasi getaran dan kemiringan suapan.
-      </p>
-      <div class="metric-grid">
-        <div class="metric-box">
-          <div class="metric-box-title">Getaran Mikro (RMS)</div>
-          <div class="metric-box-val" id="rmsSensorVal">0.00 m/s²</div>
-        </div>
-        <div class="metric-box">
-          <div class="metric-box-title">Sudut Suapan (Pitch)</div>
-          <div class="metric-box-val" id="tiltSensorVal">0°</div>
-        </div>
-      </div>
-    </div>
+    <button id="btnStart" class="action-btn" onclick="mulaSistem()">Mula Sistem</button>
+  </div>
 
-    <!-- Panel HP 2: Monitor Meja -->
-    <div id="panelMonitor" class="card" style="display:none;">
-      <h3>Indikator Kestabilan Suapan</h3>
-      <div class="score-circle" id="scoreCircle">
-        <div class="score-val" id="stabilityScore">100</div>
-        <div class="score-label">STABILITAS %</div>
-      </div>
-      <div id="tremorIndicator" class="status-alert calm">
-        Kondisi Tangan Tenang & Siap Menyuap
-      </div>
-      <div class="metric-grid">
-        <div class="metric-box">
-          <div class="metric-box-title">Intensitas Getaran</div>
-          <div class="metric-box-val" id="monitorRms">0.00 m/s²</div>
-        </div>
-        <div class="metric-box">
-          <div class="metric-box-title">Total Suapan Terdeteksi</div>
-          <div class="metric-box-val" id="scoopCount">0 Kali</div>
-        </div>
-      </div>
-    </div>
+  <!-- Paparan HP 1 -->
+  <div id="panelSensor" class="card">
+    <h3>Data Gerakan HP 1</h3>
+    <p>Getaran (RMS):</p>
+    <div class="val-box" id="dispRms">0.00 m/s²</div>
+    <p>Sudut Suapan (Pitch):</p>
+    <div class="val-box" id="dispPitch">0°</div>
+  </div>
 
-    <div class="card">
-      <h4>Log Transmisi Data</h4>
-      <div class="log-box" id="logText">Menunggu aktivasi sistem...</div>
-    </div>
+  <!-- Paparan HP 2 -->
+  <div id="panelMonitor" class="card" style="display: none;">
+    <h3>Pantauan Meja HP 2</h3>
+    <p>Skor Kestabilan:</p>
+    <div class="val-box" id="dispScore">100%</div>
+    <p>Total Suapan:</p>
+    <div class="val-box" id="dispScoop">0 Kali</div>
+  </div>
+
+  <div class="card">
+    <div class="log-area" id="logBox">Menunggu sistem dimulakan...</div>
   </div>
 
   <script>
-    const BROKER_URL = "wss://broker.hivemq.com:8884/mqtt";
-    const TOPIC_FEED = "spoonsteady/telemetry";
+    const BROKER = "wss://broker.hivemq.com:8884/mqtt";
+    const TOPIK = "spoonsteady/telemetry/demo";
 
     let client = null;
-    let currentRole = "sensor";
-    let audioCtx = null;
-    let totalScoops = 0;
-    let isInScoopMotion = false;
-    let lastPublish = 0;
-    let currentPitch = 0;
+    let peranan = "sensor";
+    let sudutSemasa = 0;
+    let suapanTerkira = 0;
+    let sedangMenyuap = false;
+    let masaTerakhir = 0;
 
-    function setRole(role) {
-      currentRole = role;
-      document.getElementById("btnRoleSensor").classList.toggle("active", role === "sensor");
-      document.getElementById("btnRoleMonitor").classList.toggle("active", role === "monitor");
-      document.getElementById("panelSensor").style.display = role === "sensor" ? "block" : "none";
-      document.getElementById("panelMonitor").style.display = role === "monitor" ? "block" : "none";
-      writeLog(`Beralih mode: ${role === 'sensor' ? 'HP 1 (Sensor Tangan)' : 'HP 2 (Monitor Meja)'}`);
+    function catatLog(teks) {
+      const box = document.getElementById("logBox");
+      const jam = new Date().toLocaleTimeString();
+      box.innerHTML = `[${jam}] ${teks}<br>` + box.innerHTML;
     }
 
-    function writeLog(msg) {
-      const log = document.getElementById("logText");
-      if (log) {
-        const time = new Date().toLocaleTimeString();
-        log.innerHTML = `[${time}] ${msg}<br>` + log.innerHTML;
-      }
+    function pilihMod(mod) {
+      peranan = mod;
+      document.getElementById("btnRole1").classList.toggle("active", mod === "sensor");
+      document.getElementById("btnRole2").classList.toggle("active", mod === "monitor");
+      document.getElementById("panelSensor").style.display = (mod === "sensor") ? "block" : "none";
+      document.getElementById("panelMonitor").style.display = (mod === "monitor") ? "block" : "none";
+      catatLog("Beralih ke mod: " + mod);
     }
 
-    function initApp() {
+    function mulaSistem() {
+      catatLog("Menyambung ke MQTT...");
+      document.getElementById("btnStart").innerText = "Menyambung...";
+
+      // Sambungan MQTT
       try {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      } catch(e) {}
+        client = mqtt.connect(BROKER);
 
-      document.getElementById("btnStart").innerText = "Menghubungkan MQTT...";
-      writeLog("Menghubungkan ke broker MQTT...");
+        client.on("connect", function () {
+          document.getElementById("mqttStatus").innerText = "Online";
+          document.getElementById("mqttStatus").style.color = "green";
+          document.getElementById("btnStart").innerText = "Sistem Aktif";
+          catatLog("Berjaya sambung ke HiveMQ!");
+          client.subscribe(TOPIK);
+        });
 
-      if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
-        DeviceMotionEvent.requestPermission().then(res => {
-          if (res === "granted") startSensors();
-          else writeLog("Izin gerak ditolak.");
-        }).catch(err => writeLog("Error izin: " + err));
-      } else {
-        startSensors();
-      }
-
-      if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
-        DeviceOrientationEvent.requestPermission().catch(() => {});
-      }
-
-      client = mqtt.connect(BROKER_URL);
-
-      client.on("connect", () => {
-        document.getElementById("connStatus").className = "badge connected";
-        document.getElementById("connStatus").innerText = "Online";
-        document.getElementById("btnStart").innerText = "Sistem Aktif";
-        writeLog("Broker HiveMQ terhubung (Online).");
-        client.subscribe(TOPIC_FEED);
-      });
-
-      client.on("message", (topic, payload) => {
-        try {
-          const data = JSON.parse(payload.toString());
-          if (topic === TOPIC_FEED && currentRole === "monitor") {
-            updateMonitorView(data);
+        client.on("message", function (topik, mesej) {
+          if (peranan === "monitor") {
+            try {
+              const data = JSON.parse(mesej.toString());
+              kemaskiniMonitor(data);
+            } catch (err) {}
           }
-        } catch (e) {}
-      });
+        });
 
-      client.on("error", (err) => {
-        writeLog("MQTT Error: " + err);
-      });
+        client.on("error", function (err) {
+          catatLog("Ralat MQTT: " + err);
+        });
+      } catch (e) {
+        catatLog("Gagal memulakan MQTT: " + e.message);
+      }
+
+      // Pengaktifan Sensor HP
+      if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+        DeviceMotionEvent.requestPermission().then(izin => {
+          if (izin === "granted") aktifkanSensor();
+          else catatLog("Izin sensor ditolak!");
+        }).catch(e => catatLog("Ralat izin: " + e));
+      } else {
+        aktifkanSensor();
+      }
     }
 
-    function startSensors() {
-      writeLog("Sensor gerak & sudut aktif.");
+    function aktifkanSensor() {
+      catatLog("Mendengar pergerakan...");
 
-      window.addEventListener("deviceorientation", (e) => {
+      // Baca orientasi
+      window.addEventListener("deviceorientation", function (e) {
         if (e.beta !== null && e.beta !== undefined) {
-          currentPitch = Math.round(e.beta);
-          const el = document.getElementById("tiltSensorVal");
-          if (el) el.innerText = `${currentPitch}°`;
+          sudutSemasa = Math.round(e.beta);
+          document.getElementById("dispPitch").innerText = sudutSemasa + "°";
         }
       });
 
-      window.addEventListener("devicemotion", (e) => {
+      // Baca akselerometer
+      window.addEventListener("devicemotion", function (e) {
         const acc = e.accelerationIncludingGravity;
         if (!acc) return;
 
@@ -234,63 +181,40 @@
         const ay = acc.y || 0;
         const az = acc.z || 0;
 
-        const totalMag = Math.sqrt(ax * ax + ay * ay + az * az);
-        const rmsDeviation = Math.abs(totalMag - 9.81);
+        const jumlah = Math.sqrt(ax * ax + ay * ay + az * az);
+        const getaran = Math.abs(jumlah - 9.81);
 
-        if (currentPitch === 0 && (ay !== 0 || az !== 0)) {
-          const calculatedPitch = Math.round(Math.atan2(ay, Math.sqrt(ax * ax + az * az)) * (180 / Math.PI));
-          currentPitch = calculatedPitch;
-          const el = document.getElementById("tiltSensorVal");
-          if (el) el.innerText = `${currentPitch}°`;
+        // Pengiraan sudut sandaran jika orientasi tidak disokong
+        if (sudutSemasa === 0 && (ay !== 0 || az !== 0)) {
+          sudutSemasa = Math.round(Math.atan2(ay, Math.sqrt(ax * ax + az * az)) * (180 / Math.PI));
+          document.getElementById("dispPitch").innerText = sudutSemasa + "°";
         }
 
-        const rmsEl = document.getElementById("rmsSensorVal");
-        if (rmsEl) rmsEl.innerText = `${rmsDeviation.toFixed(2)} m/s²`;
+        document.getElementById("dispRms").innerText = getaran.toFixed(2) + " m/s²";
 
-        const now = Date.now();
-        if (currentRole === "sensor" && client && client.connected && (now - lastPublish > 200)) {
-          lastPublish = now;
-          client.publish(TOPIC_FEED, JSON.stringify({
-            rms: Number(rmsDeviation.toFixed(2)),
-            pitch: currentPitch
+        // Hantar data ke broker setiap 250ms
+        const sekarang = Date.now();
+        if (peranan === "sensor" && client && client.connected && (sekarang - masaTerakhir > 250)) {
+          masaTerakhir = sekarang;
+          client.publish(TOPIK, JSON.stringify({
+            rms: Number(getaran.toFixed(2)),
+            pitch: sudutSemasa
           }));
         }
       });
     }
 
-    function updateMonitorView(data) {
-      const rms = data.rms;
-      const pitch = data.pitch;
+    function kemaskiniMonitor(data) {
+      let skor = Math.max(10, Math.round(100 - (data.rms * 25)));
+      document.getElementById("dispScore").innerText = skor + "%";
 
-      document.getElementById("monitorRms").innerText = `${rms.toFixed(2)} m/s²`;
-
-      let stability = Math.max(10, Math.round(100 - (rms * 28)));
-      document.getElementById("stabilityScore").innerText = stability;
-
-      const indicator = document.getElementById("tremorIndicator");
-      const circle = document.getElementById("scoreCircle");
-
-      if (rms < 0.8) {
-        indicator.className = "status-alert calm";
-        indicator.innerText = "Kondisi Tangan Tenang & Stabil";
-        circle.style.borderColor = "var(--safe)";
-      } else if (rms >= 0.8 && rms < 2.0) {
-        indicator.className = "status-alert mild";
-        indicator.innerText = "Getaran Ringan Terdeteksi";
-        circle.style.borderColor = "var(--warning)";
-      } else {
-        indicator.className = "status-alert tremor";
-        indicator.innerText = "⚠️ Tremor Signifikan! Makanan Berisiko Tumpah";
-        circle.style.borderColor = "var(--danger)";
-      }
-
-      if (pitch > 35 && !isInScoopMotion) {
-        isInScoopMotion = true;
-      } else if (pitch < 15 && isInScoopMotion) {
-        isInScoopMotion = false;
-        totalScoops++;
-        document.getElementById("scoopCount").innerText = `${totalScoops} Kali`;
-        writeLog(`Suapan ke-${totalScoops} terdeteksi.`);
+      if (data.pitch > 35 && !sedangMenyuap) {
+        sedangMenyuap = true;
+      } else if (data.pitch < 15 && sedangMenyuap) {
+        sedangMenyuap = false;
+        suapanTerkira++;
+        document.getElementById("dispScoop").innerText = suapanTerkira + " Kali";
+        catatLog("Suapan dikesan: " + suapanTerkira);
       }
     }
   </script>
