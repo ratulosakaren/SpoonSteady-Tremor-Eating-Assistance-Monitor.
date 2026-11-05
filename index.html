@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SpoonSteady</title>
+  <title>SpoonSteady - Pemantau Tremor & Makan</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
     body {
-      font-family: sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       margin: 0;
       padding: 16px;
       background: #f1f5f9;
@@ -63,14 +63,14 @@
     <p>Status: <b id="mqttStatus" style="color: red;">Offline</b></p>
     
     <div class="btn-group">
-      <button id="btnRole1" class="role-btn active" onclick="pilihMod('sensor')">📱 HP 1 (Senduk)</button>
-      <button id="btnRole2" class="role-btn" onclick="pilihMod('monitor')">🍽️ HP 2 (Meja)</button>
+      <button id="btnRole1" class="role-btn active" onclick="pilihMode('sensor')">📱 HP 1 (Sendok)</button>
+      <button id="btnRole2" class="role-btn" onclick="pilihMode('monitor')">🍽️ HP 2 (Meja)</button>
     </div>
 
-    <button id="btnStart" class="action-btn" onclick="mulaSistem()">Mula Sistem</button>
+    <button id="btnStart" class="action-btn" onclick="mulaiSistem()">Mulai Sistem</button>
   </div>
 
-  <!-- Paparan HP 1 -->
+  <!-- Tampilan HP 1 -->
   <div id="panelSensor" class="card">
     <h3>Data Gerakan HP 1</h3>
     <p>Getaran (RMS):</p>
@@ -79,7 +79,7 @@
     <div class="val-box" id="dispPitch">0°</div>
   </div>
 
-  <!-- Paparan HP 2 -->
+  <!-- Tampilan HP 2 -->
   <div id="panelMonitor" class="card" style="display: none;">
     <h3>Pantauan Meja HP 2</h3>
     <p>Skor Kestabilan:</p>
@@ -89,7 +89,7 @@
   </div>
 
   <div class="card">
-    <div class="log-area" id="logBox">Menunggu sistem dimulakan...</div>
+    <div class="log-area" id="logBox">Menunggu sistem dimulai...</div>
   </div>
 
   <script>
@@ -97,11 +97,11 @@
     const TOPIK = "spoonsteady/telemetry/demo";
 
     let client = null;
-    let peranan = "sensor";
-    let sudutSemasa = 0;
-    let suapanTerkira = 0;
+    let peran = "sensor";
+    let sudutSekarang = 0;
+    let suapanTerhitung = 0;
     let sedangMenyuap = false;
-    let masaTerakhir = 0;
+    let waktuTerakhir = 0;
 
     function catatLog(teks) {
       const box = document.getElementById("logBox");
@@ -109,18 +109,18 @@
       box.innerHTML = `[${jam}] ${teks}<br>` + box.innerHTML;
     }
 
-    function pilihMod(mod) {
-      peranan = mod;
-      document.getElementById("btnRole1").classList.toggle("active", mod === "sensor");
-      document.getElementById("btnRole2").classList.toggle("active", mod === "monitor");
-      document.getElementById("panelSensor").style.display = (mod === "sensor") ? "block" : "none";
-      document.getElementById("panelMonitor").style.display = (mod === "monitor") ? "block" : "none";
-      catatLog("Beralih ke mod: " + mod);
+    function pilihMode(mode) {
+      peran = mode;
+      document.getElementById("btnRole1").classList.toggle("active", mode === "sensor");
+      document.getElementById("btnRole2").classList.toggle("active", mode === "monitor");
+      document.getElementById("panelSensor").style.display = (mode === "sensor") ? "block" : "none";
+      document.getElementById("panelMonitor").style.display = (mode === "monitor") ? "block" : "none";
+      catatLog("Beralih ke mode: " + (mode === "sensor" ? "HP 1 (Sendok)" : "HP 2 (Meja)"));
     }
 
-    function mulaSistem() {
-      catatLog("Menyambung ke MQTT...");
-      document.getElementById("btnStart").innerText = "Menyambung...";
+    function mulaiSistem() {
+      catatLog("Menghubungkan ke MQTT...");
+      document.getElementById("btnStart").innerText = "Menghubungkan...";
 
       // Sambungan MQTT
       try {
@@ -130,45 +130,45 @@
           document.getElementById("mqttStatus").innerText = "Online";
           document.getElementById("mqttStatus").style.color = "green";
           document.getElementById("btnStart").innerText = "Sistem Aktif";
-          catatLog("Berjaya sambung ke HiveMQ!");
+          catatLog("Berhasil terhubung ke HiveMQ!");
           client.subscribe(TOPIK);
         });
 
-        client.on("message", function (topik, mesej) {
-          if (peranan === "monitor") {
+        client.on("message", function (topik, pesan) {
+          if (peran === "monitor") {
             try {
-              const data = JSON.parse(mesej.toString());
-              kemaskiniMonitor(data);
+              const data = JSON.parse(pesan.toString());
+              perbaruiMonitor(data);
             } catch (err) {}
           }
         });
 
         client.on("error", function (err) {
-          catatLog("Ralat MQTT: " + err);
+          catatLog("Error MQTT: " + err);
         });
       } catch (e) {
-        catatLog("Gagal memulakan MQTT: " + e.message);
+        catatLog("Gagal memulai MQTT: " + e.message);
       }
 
-      // Pengaktifan Sensor HP
+      // Izin & Pengaktifan Sensor HP
       if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
         DeviceMotionEvent.requestPermission().then(izin => {
           if (izin === "granted") aktifkanSensor();
           else catatLog("Izin sensor ditolak!");
-        }).catch(e => catatLog("Ralat izin: " + e));
+        }).catch(e => catatLog("Error izin sensor: " + e));
       } else {
         aktifkanSensor();
       }
     }
 
     function aktifkanSensor() {
-      catatLog("Mendengar pergerakan...");
+      catatLog("Membaca sensor gerak...");
 
       // Baca orientasi
       window.addEventListener("deviceorientation", function (e) {
         if (e.beta !== null && e.beta !== undefined) {
-          sudutSemasa = Math.round(e.beta);
-          document.getElementById("dispPitch").innerText = sudutSemasa + "°";
+          sudutSekarang = Math.round(e.beta);
+          document.getElementById("dispPitch").innerText = sudutSekarang + "°";
         }
       });
 
@@ -181,30 +181,30 @@
         const ay = acc.y || 0;
         const az = acc.z || 0;
 
-        const jumlah = Math.sqrt(ax * ax + ay * ay + az * az);
-        const getaran = Math.abs(jumlah - 9.81);
+        const total = Math.sqrt(ax * ax + ay * ay + az * az);
+        const getaran = Math.abs(total - 9.81);
 
-        // Pengiraan sudut sandaran jika orientasi tidak disokong
-        if (sudutSemasa === 0 && (ay !== 0 || az !== 0)) {
-          sudutSemasa = Math.round(Math.atan2(ay, Math.sqrt(ax * ax + az * az)) * (180 / Math.PI));
-          document.getElementById("dispPitch").innerText = sudutSemasa + "°";
+        // Perhitungan sudut cadangan jika orientasi bawaan 0
+        if (sudutSekarang === 0 && (ay !== 0 || az !== 0)) {
+          sudutSekarang = Math.round(Math.atan2(ay, Math.sqrt(ax * ax + az * az)) * (180 / Math.PI));
+          document.getElementById("dispPitch").innerText = sudutSekarang + "°";
         }
 
         document.getElementById("dispRms").innerText = getaran.toFixed(2) + " m/s²";
 
-        // Hantar data ke broker setiap 250ms
+        // Kirim data ke broker setiap 250ms
         const sekarang = Date.now();
-        if (peranan === "sensor" && client && client.connected && (sekarang - masaTerakhir > 250)) {
-          masaTerakhir = sekarang;
+        if (peran === "sensor" && client && client.connected && (sekarang - waktuTerakhir > 250)) {
+          waktuTerakhir = sekarang;
           client.publish(TOPIK, JSON.stringify({
             rms: Number(getaran.toFixed(2)),
-            pitch: sudutSemasa
+            pitch: sudutSekarang
           }));
         }
       });
     }
 
-    function kemaskiniMonitor(data) {
+    function perbaruiMonitor(data) {
       let skor = Math.max(10, Math.round(100 - (data.rms * 25)));
       document.getElementById("dispScore").innerText = skor + "%";
 
@@ -212,9 +212,9 @@
         sedangMenyuap = true;
       } else if (data.pitch < 15 && sedangMenyuap) {
         sedangMenyuap = false;
-        suapanTerkira++;
-        document.getElementById("dispScoop").innerText = suapanTerkira + " Kali";
-        catatLog("Suapan dikesan: " + suapanTerkira);
+        suapanTerhitung++;
+        document.getElementById("dispScoop").innerText = suapanTerhitung + " Kali";
+        catatLog("Suapan terdeteksi: " + suapanTerhitung);
       }
     }
   </script>
